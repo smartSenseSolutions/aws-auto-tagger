@@ -1,0 +1,23 @@
+repos:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.12.7
+  hooks:
+    # Run the linter.
+    - id: ruff-check
+    # Run the formatter.
+    - id: ruff-format
+
+- repo: local
+  hooks:
+    - id: pytest-tests
+      name: Run pytest on test directory
+      entry: uv run pytest test
+      language: system
+      types: [python]
+      pass_filenames: false
+
+- repo: https://github.com/gitleaks/gitleaks
+  rev: v8.27.0
+  hooks:
+    - id: gitleaks

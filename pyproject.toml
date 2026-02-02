@@ -1,0 +1,23 @@
+[project]
+name = "aws-tagger"
+version = "0.1.0"
+description = "AWS CloudTrail Resource Tagger"
+requires-python = ">=3.13"
+dependencies = [
+    "boto3>=1.26.0",
+    "jmespath>=1.0.1",
+    "pyyaml>=6.0.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+sources = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/*"]
+
+[tool.uv]
+dev-dependencies = []

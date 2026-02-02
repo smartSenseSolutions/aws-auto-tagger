@@ -1,0 +1,99 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+
+# serverless.yml
+service: aws-tagger
+
+provider:
+  name: aws
+  runtime: python3.13
+  region: us-east-1
+  stage: dev
+  iam:
+    role:
+      name: ${sls:stage}-aws-tagger-role
+      statements:
+        - Effect: 'Allow'
+          Action:
+            - 'ec2:*Tag*'
+            - 'lambda:*Tag*'
+            - 'eks:*Tag*'
+            - 's3:*Tag*'
+            - 'rds:*Tag*'
+            - 'elbv2:*Tag*'
+            - 'dynamodb:*Tag*'
+            - 'kms:*Tag*'
+            - 'secretsmanager:*Tag*'
+            - 'sns:*Tag*'
+            - 'sqs:*Tag*'
+            - 'logs:*Tag*'
+            - 'cloudwatch:*Tag*'
+            - 'route53:*Tag*'
+            - 'apigateway:*Tag*'
+            - 'ecs:*Tag*'
+            - 'ecr:*Tag*'
+            - 'states:*Tag*'
+            - 'cloudformation:*Tag*'
+            - 'elasticfilesystem:*Tag*'
+            - 'es:*Tag*'
+            - 'redshift:*Tag*'
+            - 'cognito-idp:*Tag*'
+            - 'cognito-identity:*Tag*'
+            - 'amplify:*Tag*'
+            - 'cloudfront:*Tag*'
+            - 'glue:*Tag*'
+            - 'bedrock:*Tag*'
+            - 'sagemaker:*Tag*'
+            - 'iam:*Tag*'
+            - 'efs:*Tag*'
+            - 'stepfunctions:*Tag*'
+            - 'opensearch:*Tag*'
+          Resource: '*'
+      managedPolicies:
+        - arn:aws:iam::aws:policy/AWSCloudTrail_ReadOnlyAccess
+        - arn:aws:iam::aws:policy/ResourceGroupsandTagEditorFullAccess
+
+package:
+  individually: true
+  exclude:
+    - "test/**"
+    - "tmp/**"
+    - "**/__pycache__/**"
+    - ".ruff_cache/**"
+    - ".pytest_cache/**"
+    - ".mypy_cache/**"
+    - ".vscode/**"
+    - ".env"
+    - ".env.*"
+
+functions:
+  # A function
+  tagger:
+    # The file and module for this specific function. Cannot be used with 'image'.
+    description: Auto Tagging AWS Resources form CloudTrail for resource creation-time and owner
+    handler: src.main.handler
+    runtime: python3.12
+
+    timeout: 120
+    memorySize: 512
+    ephemeralStorageSize: 512
+    name: ${sls:stage}-aws-tagger
+    events:
+    - schedule:
+        name: ${sls:stage}-${self:functions.tagger.name}
+        description: a description of ${sls:stage}-${self:functions.tagger.name}'s purpose
+        # Can also be an array of rate/cron expressions
+        rate: rate(24 hours)
+
+resources:
+  Resources:
+    # AWS Resource Group for tagged resources
+    TaggedResourcesGroup:
+      Type: AWS::ResourceGroups::Group
+      Properties:
+        Name: ${sls:stage}-aws-tagged-resources
+        Description: Resource group containing all resources tagged by aws-tagger lambda function
+        ResourceQuery:
+          Type: TAG_FILTERS_1_0
+          Query:
+            TagFilters:
+              - Key: "created_at"
