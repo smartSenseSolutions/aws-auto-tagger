@@ -10,7 +10,7 @@ from .tagger import CloudTrailTagger
 from .utils import logger
 
 
-def main(region="us-east-1", hours=24):
+def main(region="us-east-1", hours=25):
     """Simple main function"""
 
     # Optional: Configure logging level
@@ -28,7 +28,7 @@ def main(region="us-east-1", hours=24):
 def handler(event, context):
     main(
         region=event.get("region", os.getenv("AWS_REGION", "us-east-1")),
-        hours=event.get("hours", 24),
+        hours=event.get("hours", 25),
     )
     return {
         "statusCode": 200,
