@@ -5,7 +5,7 @@ Automatically tags AWS resources based on CloudTrail events. When someone create
 **What it does**
 - Monitors CloudTrail events for resource creation
 - Based on resource creation event it automatically tags those resources with owner and creation time
-- Supports AWS services (EC2, S3, Lambda, RDS, EKS, SES, SQS, ECS, Bedrock etc.)
+- Supports AWS services (EC2, S3, Lambda, RDS, EKS, SES, SQS, ECS, Bedrock, Kafka/MSK, Kinesis, Batch, ElastiCache, MemoryDB, Auto Scaling etc.)
 - Runs as a scheduled Lambda function
 Of course. Here is the corrected text with suggestions for improvement.
 
@@ -60,7 +60,7 @@ graph LR
 
 ### Pre-required tools
 ```
-pip install uv pytest pre-commit
+pip install uv pytest prek
 
 npm install -g serverless
 ```
@@ -95,8 +95,9 @@ sls deploy
 
 The AWS Tagger automatically tags resources from the following AWS services:
 
-- **Compute**: EC2, Lambda, ECS, EKS
-- **Storage**: S3, EFS, RDS, DynamoDB, Redshift
+- **Compute**: EC2, Lambda, ECS, EKS, Auto Scaling, Batch
+- **Storage/Database**: S3, EFS, RDS/Aurora, DynamoDB, Redshift, ElastiCache, MemoryDB
+- **Streaming**: Kinesis, Kafka (MSK)
 - **Networking**: VPC, ELB, CloudFront, Route53
 - **Security**: IAM, KMS, Secrets Manager, Cognito
 - **Monitoring**: CloudWatch Logs, CloudWatch Alarms

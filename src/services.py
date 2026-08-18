@@ -214,6 +214,14 @@ SERVICE_CONFIGS = {
             "jmespath": "service.serviceName",
         },
     },
+    "autoscaling": {
+        "CreateAutoScalingGroup": {
+            "eventsource": "autoscaling",
+            "resource_type": "autoscaling:group",
+            "section": "requestParameters",
+            "jmespath": "autoScalingGroupName",
+        }
+    },
     "ecr": {
         "CreateRepository": {
             "eventsource": "ecr",
@@ -314,6 +322,64 @@ SERVICE_CONFIGS = {
             "resource_type": "cloudfront:distribution",
             "section": "responseElements",
             "jmespath": "distribution.id",
+        }
+    },
+    "kafka": {
+        "CreateClusterV2": {
+            "eventsource": "kafka",
+            "resource_type": "kafka:cluster",
+            "section": "responseElements",
+            "jmespath": "clusterArn",
+        },
+        "CreateCluster": {
+            "eventsource": "kafka",
+            "resource_type": "kafka:cluster",
+            "section": "responseElements",
+            "jmespath": "clusterArn",
+        },
+    },
+    "kinesis": {
+        "CreateStream": {
+            "eventsource": "kinesis",
+            "resource_type": "kinesis:stream",
+            "section": "requestParameters",
+            "jmespath": "streamName",
+        }
+    },
+    "batch": {
+        "CreateComputeEnvironment": {
+            "eventsource": "batch",
+            "resource_type": "batch:computeenvironment",
+            "section": "responseElements",
+            "jmespath": "computeEnvironmentArn",
+        },
+        "CreateJobQueue": {
+            "eventsource": "batch",
+            "resource_type": "batch:jobqueue",
+            "section": "responseElements",
+            "jmespath": "jobQueueArn",
+        },
+    },
+    "elasticache": {
+        "CreateReplicationGroup": {
+            "eventsource": "elasticache",
+            "resource_type": "elasticache:replicationgroup",
+            "section": "responseElements",
+            "jmespath": "aRN",
+        },
+        "CreateCacheCluster": {
+            "eventsource": "elasticache",
+            "resource_type": "elasticache:cluster",
+            "section": "responseElements",
+            "jmespath": "cacheCluster.aRN",
+        },
+    },
+    "memorydb": {
+        "CreateCluster": {
+            "eventsource": "memorydb",
+            "resource_type": "memorydb:cluster",
+            "section": "responseElements",
+            "jmespath": "cluster.aRN",
         }
     },
     "iam": {
@@ -569,6 +635,54 @@ def tag_resource(
                 clients["glue"].tag_resource(
                     ResourceArn=resource_arn,
                     TagsToAdd={tag["Key"]: tag["Value"] for tag in tags},
+                )
+
+            case "autoscaling":
+                # Auto Scaling Groups use a distinct tag shape (ResourceId/ResourceType/PropagateAtLaunch)
+                clients["autoscaling"].create_or_update_tags(
+                    Tags=[
+                        {
+                            "ResourceId": resource_id,
+                            "ResourceType": "auto-scaling-group",
+                            "Key": tag["Key"],
+                            "Value": tag["Value"],
+                            "PropagateAtLaunch": True,
+                        }
+                        for tag in tags
+                    ]
+                )
+
+            case "kinesis":
+                # Kinesis expects stream name and key-value tags
+                tag_dict = {tag["Key"]: tag["Value"] for tag in tags}
+                clients["kinesis"].add_tags_to_stream(
+                    StreamName=resource_id, Tags=tag_dict
+                )
+
+            case "batch":
+                # AWS Batch expects ARN and key-value tags
+                tag_dict = {tag["Key"]: tag["Value"] for tag in tags}
+                clients["batch"].tag_resource(resourceArn=resource_id, tags=tag_dict)
+
+            case "elasticache":
+                # ElastiCache expects ARN and key-value tags
+                clients["elasticache"].tag_resource(
+                    ResourceName=resource_id,
+                    Tags=[{"Key": tag["Key"], "Value": tag["Value"]} for tag in tags],
+                )
+
+            case "kafka":
+                # MSK expects ARN and key-value tags
+                clients["kafka"].tag_resource(
+                    ResourceArn=resource_id,
+                    Tags={tag["Key"]: tag["Value"] for tag in tags},
+                )
+
+            case "memorydb":
+                # MemoryDB expects ARN and key-value tags
+                clients["memorydb"].tag_resource(
+                    ResourceArn=resource_id,
+                    Tags=[{"Key": tag["Key"], "Value": tag["Value"]} for tag in tags],
                 )
 
             case "iam":
