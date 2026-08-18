@@ -59,6 +59,12 @@ SERVICE_CONFIGS = {
             "section": "responseElements",
             "jmespath": "allocationId",
         },
+        "CreateNatGateway": {
+            "eventsource": "ec2",
+            "resource_type": "ec2:natgateway",
+            "section": "responseElements",
+            "jmespath": "natGateway.natGatewayId",
+        },
     },
     "s3": {
         "CreateBucket": {
