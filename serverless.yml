@@ -47,6 +47,12 @@ provider:
             - 'efs:*Tag*'
             - 'stepfunctions:*Tag*'
             - 'opensearch:*Tag*'
+            - 'autoscaling:*Tag*'
+            - 'kafka:*Tag*'
+            - 'kinesis:*Tag*'
+            - 'batch:*Tag*'
+            - 'elasticache:*Tag*'
+            - 'memorydb:*Tag*'
           Resource: '*'
       managedPolicies:
         - arn:aws:iam::aws:policy/AWSCloudTrail_ReadOnlyAccess
