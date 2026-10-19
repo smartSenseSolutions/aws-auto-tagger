@@ -98,12 +98,29 @@ sls deploy
 | `created_at` | Event time, formatted `YYYY-MM-DD HH:MM:SS UTC` |
 | `owner_email` | Email of the owner, or `Unknown` (see below) |
 
-`owner_email` is resolved for **IAM users only** (CloudTrail `userIdentity.type == IAMUser`), in this order:
+`owner_email` is resolved for **IAM users** and **IAM Identity Center (SSO) users**:
+
+*IAM user* (CloudTrail `userIdentity.type == IAMUser`), in this order:
 1. The IAM user name looks like an email address → used as is.
 2. The IAM user has a tag `EMAIL_ID: <email>` and the value is a valid email → that value is used.
 3. Otherwise (no tag, invalid tag value, or the lookup fails) → `Unknown`.
 
-Assumed-role, SSO/federated and root identities always resolve to `Unknown`: their CloudTrail name is a caller-chosen session name and can't be trusted.
+*SSO user* (assumed role `AWSReservedSSO_*` under the Identity Center `aws-reserved/sso.amazonaws.com` role path; its session name is the Identity Center username, set by Identity Center, not the caller):
+1. The user's Identity Store profile has a valid email → the primary email is used.
+2. Otherwise (lookup not configured, user not found, or the call fails) → the session name if it looks like an email.
+3. Otherwise → `Unknown`.
+
+SSO support is optional and works for IAM-only, SSO-only, and mixed IAM + SSO accounts: each identity type resolves through its own path, and without `IDENTITY_STORE_ID` no Identity Store call is made.
+
+To enable the profile lookup, deploy with the Identity Center directory ID (and its region, if it differs from the Lambda's):
+```
+export IDENTITY_STORE_ID=d-xxxxxxxxxx      # IAM Identity Center > Settings > Identity source
+export IDENTITY_STORE_REGION=eu-west-1     # optional
+sls deploy
+```
+The Identity Store API is only callable from the Identity Center management (or delegated admin) account, so run the tagger there for the lookup to work.
+
+Other assumed-role, federated and root identities always resolve to `Unknown`: their CloudTrail name is a caller-chosen session name and can't be trusted.
 
 To make emails resolvable for IAM users, tag them, e.g. `aws iam tag-user --user-name <name> --tags Key=EMAIL_ID,Value=<email>`. Restrict who may write `EMAIL_ID` (e.g. via an IAM policy/SCP on `aws:TagKeys`), since changing it redirects notifications.
 

@@ -61,6 +61,7 @@ After any code change under `src/` (new/removed service, tag names, tagging beha
 ### Conventions
 
 - Generic reusable helpers (e.g. `is_email`) go in `src/utils.py`, not inline in `tagger.py`/`services.py`. Check there before writing a new one.
+- Environment variables are read only through `src/data.py::Settings` (no `os.getenv` elsewhere). Add new env config as a field there, and pass it to the Lambda via `serverless.yml` `functions.tagger.environment`.
 
 ### Key files
 

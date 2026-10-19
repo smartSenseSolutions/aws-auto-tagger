@@ -4,8 +4,7 @@ Simple Main Usage - Clean and Easy
 This replaces the complex 200-line main.py with something much simpler.
 """
 
-import os
-
+from .data import Settings
 from .tagger import CloudTrailTagger
 from .utils import logger
 
@@ -27,7 +26,7 @@ def main(region="us-east-1", hours=25):
 
 def handler(event, context):
     main(
-        region=event.get("region", os.getenv("AWS_REGION", "us-east-1")),
+        region=event.get("region", Settings().aws_region),
         hours=event.get("hours", 25),
     )
     return {
