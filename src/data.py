@@ -93,6 +93,8 @@ class TaggingConfig:
 
     owner_tag_name: str = "owner"
     creation_time_tag_name: str = "created_at"
+    owner_email_tag_name: str = "owner_email"
+    iam_email_tag_key: str = "EMAIL_ID"
     creation_time_format: str = "%Y-%m-%d %H:%M:%S UTC"
     include_creation_time: bool = True
     additional_tags: dict = None

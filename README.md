@@ -4,8 +4,8 @@ Automatically tags AWS resources based on CloudTrail events. When someone create
 
 **What it does**
 - Monitors CloudTrail events for resource creation
-- Based on resource creation event it automatically tags those resources with owner and creation time
-- Supports AWS services (EC2, S3, Lambda, RDS, EKS, SES, SQS, ECS, Bedrock, Kafka/MSK, Kinesis, Batch, ElastiCache, MemoryDB, Auto Scaling etc.)
+- Based on resource creation event it automatically tags those resources with owner, creation time and owner email
+- Supports AWS services (EC2, S3, Lambda, RDS, EKS, SNS, SQS, ECS, Bedrock, Kafka/MSK, Kinesis, Batch, ElastiCache, MemoryDB, Auto Scaling etc.)
 - Runs as a scheduled Lambda function
 Of course. Here is the corrected text with suggestions for improvement.
 
@@ -26,6 +26,7 @@ Of course. Here is the corrected text with suggestions for improvement.
     - [Install packages](#install-packages)
     - [Test locally](#test-locally)
     - [Deploy to AWS Lambda with scheduling](#deploy-to-aws-lambda-with-scheduling)
+  - [Tags applied](#tags-applied)
   - [Supported AWS Services](#supported-aws-services)
 
 ## Architecture
@@ -36,7 +37,7 @@ graph LR
     
     CT[CloudTrail] --> LF
 
-    LF --> AWS[Tag AWS Resources 'owner : created_at']
+    LF --> AWS[Tag AWS Resources 'owner : created_at : owner_email']
     
     AWS
     subgraph "Resource Tagged"
@@ -91,13 +92,28 @@ python -m src.main
 sls deploy
 ```
 
+## Tags applied
+
+| Tag | Value |
+|---|---|
+| `owner` | CloudTrail username of whoever created the resource |
+| `created_at` | Event time, formatted `YYYY-MM-DD HH:MM:SS UTC` |
+| `owner_email` | Email of the owner, or `Unknown` (see below) |
+
+`owner_email` is resolved in this order:
+1. `owner` already looks like an email address → used as is.
+2. The IAM user named in `owner` has a tag `EMAIL_ID: <email>` → that value is used.
+3. Otherwise (no tag, not an IAM user such as an assumed role or root, or the lookup fails) → `Unknown`.
+
+To make emails resolvable for IAM users, tag them, e.g. `aws iam tag-user --user-name <name> --tags Key=EMAIL_ID,Value=<email>`. Only IAM users are looked up; assumed-role/SSO session names that aren't emails resolve to `Unknown`.
+
 ## Supported AWS Services
 
 The AWS Tagger automatically tags resources from the following AWS services:
 
-- **Compute**: EC2, Lambda, ECS, EKS, Auto Scaling, Batch
+- **Compute**: EC2, Lambda, ECS, ECR, EKS, Auto Scaling, Batch
 - **Storage/Database**: S3, EFS, RDS/Aurora, DynamoDB, Redshift, ElastiCache, MemoryDB
-- **Streaming**: Kinesis, Kafka (MSK)
+- **Streaming/Messaging**: Kinesis, Kafka (MSK), SNS, SQS
 - **Networking**: VPC, ELB, CloudFront, Route53
 - **Security**: IAM, KMS, Secrets Manager, Cognito
 - **Monitoring**: CloudWatch Logs, CloudWatch Alarms

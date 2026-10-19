@@ -54,6 +54,10 @@ This requires touching **three** places that must stay in sync:
 
 `test/test_sls_lint.py::test_validate_sls_policy` enforces step 3 — it fails if any `SERVICE_CONFIGS` key has no matching IAM action in `serverless.yml`. Run this test after adding a service.
 
+### README sync
+
+After any code change under `src/` (new/removed service, tag names, tagging behavior), run the `sync-readme` skill (`.claude/skills/sync-readme`) before finishing, so `README.md` stays in step.
+
 ### Key files
 
 - `src/services.py` — the service registry (`SERVICE_CONFIGS`) and the tagging dispatch (`tag_resource`). This is where nearly all service-specific logic lives.

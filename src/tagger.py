@@ -4,12 +4,15 @@ Simplified CloudTrail Resource Tagger - Clean and Concise
 This replaces the original 450-line tagger.py with something much simpler.
 """
 
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 from .services import get_service_config, tag_resource
 from .clients import get_clients
 from .utils import logger
 from .data import TaggingStats, ResourceInfo, EventProcessingResult, TaggingConfig
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class CloudTrailTagger:
@@ -19,6 +22,7 @@ class CloudTrailTagger:
         self.region = region
         self.config = config or TaggingConfig()
         self.clients = get_clients(region)
+        self._email_cache: Dict[str, str] = {}
 
     def run(self, hours: int = 24) -> EventProcessingResult:
         """Main execution - much simpler than before"""
@@ -61,6 +65,7 @@ class CloudTrailTagger:
 
             # Extract creation time from event
             creation_time = self._format_creation_time(event.get("EventTime"))
+            owner_email = self._owner_email(username)
 
             # Tag each resource
             for resource_id in resource_ids:
@@ -72,6 +77,7 @@ class CloudTrailTagger:
                     creation_time,
                     self.config,
                     self.clients,
+                    owner_email=owner_email,
                 )
 
                 # Track results
@@ -176,6 +182,29 @@ class CloudTrailTagger:
         except (ValueError, AttributeError) as e:
             logger.warning(f"Could not format creation time {event_time}: {e}")
             return str(event_time)
+
+    def _owner_email(self, username: str) -> str:
+        """Email from the username itself, else the IAM user's EMAIL_ID tag, else Unknown"""
+        if EMAIL_RE.match(username):
+            return username
+        if username not in self._email_cache:
+            email = "Unknown"
+            try:
+                # ponytail: first page only, IAM caps users at 50 tags
+                tags = self.clients["iam"].list_user_tags(UserName=username)["Tags"]
+                email = next(
+                    (
+                        t["Value"]
+                        for t in tags
+                        if t["Key"] == self.config.iam_email_tag_key
+                    ),
+                    email,
+                )
+            except Exception as e:
+                # NoSuchEntity is normal for assumed roles / root
+                logger.debug(f"No IAM email lookup for {username}: {e}")
+            self._email_cache[username] = email
+        return self._email_cache[username]
 
     def _empty_result(self, start_time: datetime) -> EventProcessingResult:
         """Create empty result"""

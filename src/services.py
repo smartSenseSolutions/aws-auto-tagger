@@ -428,6 +428,7 @@ def tag_resource(
     creation_time: str,
     config,
     clients,
+    owner_email: str | None = None,
 ) -> bool:
     """Tag a resource - simplified logic"""
     logger.debug(f"Tagging: {resource_type}:{resource_id}")
@@ -438,6 +439,9 @@ def tag_resource(
         # Add creation time tag if available
         if creation_time:
             tags.append({"Key": config.creation_time_tag_name, "Value": creation_time})
+
+        if owner_email:
+            tags.append({"Key": config.owner_email_tag_name, "Value": owner_email})
 
         # Add additional tags
         if config.additional_tags:
