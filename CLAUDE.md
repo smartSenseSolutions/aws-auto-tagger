@@ -58,11 +58,16 @@ This requires touching **three** places that must stay in sync:
 
 After any code change under `src/` (new/removed service, tag names, tagging behavior), run the `sync-readme` skill (`.claude/skills/sync-readme`) before finishing, so `README.md` stays in step.
 
+### Conventions
+
+- Keep code organised by responsibility: generic, reusable helpers (validation/parsing like `is_email`, logging setup, small pure functions) go in `src/utils.py`, not inline in `tagger.py` or `services.py`. Those stay focused on orchestration and service-specific tagging. Before writing a helper, check `utils.py` for an existing one; put new reusable ones there so other modules (and the planned Slack phase) can import them without pulling in `CloudTrailTagger`.
+
 ### Key files
 
 - `src/services.py` — the service registry (`SERVICE_CONFIGS`) and the tagging dispatch (`tag_resource`). This is where nearly all service-specific logic lives.
 - `src/tagger.py` — orchestration: fetch events, extract resource IDs, call `tag_resource`, collect stats.
 - `src/clients.py` — builds one boto3 client per eventsource in `SERVICE_CONFIGS`, plus `cloudtrail`, `region`, `account_id`.
+- `src/utils.py` — shared helpers (logger setup, `is_email`, and any other small reusable function). Home for anything not specific to one service or to orchestration.
 - `src/data.py` — plain dataclasses (`TaggingStats`, `ResourceInfo`, `EventProcessingResult`, `TaggingConfig`) used as return/config types; no logic.
 - `serverless.yml` — Lambda config (schedule, memory/timeout) and the IAM policy that must list a `*Tag*` action per supported service.
 - `test/stack/` — a Terraform stack (with its own state) used to spin up real test resources across services; not part of the pytest suite.
