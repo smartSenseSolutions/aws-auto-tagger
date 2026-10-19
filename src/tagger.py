@@ -4,6 +4,7 @@ Simplified CloudTrail Resource Tagger - Clean and Concise
 This replaces the original 450-line tagger.py with something much simpler.
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 from .services import get_service_config, tag_resource
@@ -62,7 +63,7 @@ class CloudTrailTagger:
 
             # Extract creation time from event
             creation_time = self._format_creation_time(event.get("EventTime"))
-            owner_email = self._owner_email(username)
+            owner_email = self._owner_email(event)
 
             # Tag each resource
             for resource_id in resource_ids:
@@ -139,7 +140,6 @@ class CloudTrailTagger:
 
     def _extract_resource_ids(self, event: Dict, config: Dict) -> List[str]:
         """Extract resource IDs from event using JMESPath - much cleaner!"""
-        import json
         import jmespath
 
         try:
@@ -180,28 +180,45 @@ class CloudTrailTagger:
             logger.warning(f"Could not format creation time {event_time}: {e}")
             return str(event_time)
 
-    def _owner_email(self, username: str) -> str:
-        """Email from the username itself, else the IAM user's EMAIL_ID tag, else Unknown"""
-        if is_email(username):
-            return username
-        if username not in self._email_cache:
+    def _owner_email(self, event: Dict) -> str:
+        """IAM users only: email from the user name, else a valid EMAIL_ID tag, else Unknown.
+
+        Assumed-role/federated session names are caller-chosen, so they are never trusted.
+        """
+        try:
+            identity = json.loads(event.get("CloudTrailEvent", "{}")).get(
+                "userIdentity", {}
+            )
+        except ValueError:
+            return "Unknown"
+        if identity.get("type") != "IAMUser" or not identity.get("userName"):
+            return "Unknown"
+
+        user = identity["userName"]
+        if is_email(user):
+            return user
+        key = identity.get(
+            "arn", user
+        )  # principal ARN; name only if CloudTrail omits it
+        if key not in self._email_cache:
             email = "Unknown"
             try:
                 # ponytail: first page only, IAM caps users at 50 tags
-                tags = self.clients["iam"].list_user_tags(UserName=username)["Tags"]
-                email = next(
+                tags = self.clients["iam"].list_user_tags(UserName=user)["Tags"]
+                tag = next(
                     (
                         t["Value"]
                         for t in tags
                         if t["Key"] == self.config.iam_email_tag_key
                     ),
-                    email,
+                    "",
                 )
+                if is_email(tag):
+                    email = tag
             except Exception as e:
-                # NoSuchEntity is normal for assumed roles / root
-                logger.debug(f"No IAM email lookup for {username}: {e}")
-            self._email_cache[username] = email
-        return self._email_cache[username]
+                logger.debug(f"No IAM email lookup for {user}: {e}")
+            self._email_cache[key] = email
+        return self._email_cache[key]
 
     def _empty_result(self, start_time: datetime) -> EventProcessingResult:
         """Create empty result"""

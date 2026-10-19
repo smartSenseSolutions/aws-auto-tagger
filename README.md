@@ -100,12 +100,14 @@ sls deploy
 | `created_at` | Event time, formatted `YYYY-MM-DD HH:MM:SS UTC` |
 | `owner_email` | Email of the owner, or `Unknown` (see below) |
 
-`owner_email` is resolved in this order:
-1. `owner` already looks like an email address → used as is.
-2. The IAM user named in `owner` has a tag `EMAIL_ID: <email>` → that value is used.
-3. Otherwise (no tag, not an IAM user such as an assumed role or root, or the lookup fails) → `Unknown`.
+`owner_email` is resolved for **IAM users only** (CloudTrail `userIdentity.type == IAMUser`), in this order:
+1. The IAM user name looks like an email address → used as is.
+2. The IAM user has a tag `EMAIL_ID: <email>` and the value is a valid email → that value is used.
+3. Otherwise (no tag, invalid tag value, or the lookup fails) → `Unknown`.
 
-To make emails resolvable for IAM users, tag them, e.g. `aws iam tag-user --user-name <name> --tags Key=EMAIL_ID,Value=<email>`. Only IAM users are looked up; assumed-role/SSO session names that aren't emails resolve to `Unknown`.
+Assumed-role, SSO/federated and root identities always resolve to `Unknown`: their CloudTrail name is a caller-chosen session name and can't be trusted.
+
+To make emails resolvable for IAM users, tag them, e.g. `aws iam tag-user --user-name <name> --tags Key=EMAIL_ID,Value=<email>`. Restrict who may write `EMAIL_ID` (e.g. via an IAM policy/SCP on `aws:TagKeys`), since changing it redirects notifications.
 
 ## Supported AWS Services
 
