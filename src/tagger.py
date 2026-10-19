@@ -4,15 +4,12 @@ Simplified CloudTrail Resource Tagger - Clean and Concise
 This replaces the original 450-line tagger.py with something much simpler.
 """
 
-import re
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 from .services import get_service_config, tag_resource
 from .clients import get_clients
-from .utils import logger
+from .utils import is_email, logger
 from .data import TaggingStats, ResourceInfo, EventProcessingResult, TaggingConfig
-
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class CloudTrailTagger:
@@ -185,7 +182,7 @@ class CloudTrailTagger:
 
     def _owner_email(self, username: str) -> str:
         """Email from the username itself, else the IAM user's EMAIL_ID tag, else Unknown"""
-        if EMAIL_RE.match(username):
+        if is_email(username):
             return username
         if username not in self._email_cache:
             email = "Unknown"
