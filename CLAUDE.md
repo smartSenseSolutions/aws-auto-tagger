@@ -60,7 +60,7 @@ After any code change under `src/` (new/removed service, tag names, tagging beha
 
 ### Conventions
 
-- Keep code organised by responsibility: generic, reusable helpers (validation/parsing like `is_email`, logging setup, small pure functions) go in `src/utils.py`, not inline in `tagger.py` or `services.py`. Those stay focused on orchestration and service-specific tagging. Before writing a helper, check `utils.py` for an existing one; put new reusable ones there so other modules (and the planned Slack phase) can import them without pulling in `CloudTrailTagger`.
+- Generic reusable helpers (e.g. `is_email`) go in `src/utils.py`, not inline in `tagger.py`/`services.py`. Check there before writing a new one.
 
 ### Key files
 

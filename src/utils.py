@@ -5,12 +5,12 @@ Utilities for AWS CloudTrail Resource Tagger v1
 import logging
 import re
 
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def is_email(value: str) -> bool:
     """True if value looks like an email address"""
-    return bool(EMAIL_RE.match(value))
+    return bool(_EMAIL_RE.match(value))
 
 
 # Configure logger for v1 package

@@ -7,8 +7,6 @@ Automatically tags AWS resources based on CloudTrail events. When someone create
 - Based on resource creation event it automatically tags those resources with owner, creation time and owner email
 - Supports AWS services (EC2, S3, Lambda, RDS, EKS, SNS, SQS, ECS, Bedrock, Kafka/MSK, Kinesis, Batch, ElastiCache, MemoryDB, Auto Scaling etc.)
 - Runs as a scheduled Lambda function
-Of course. Here is the corrected text with suggestions for improvement.
-
 
 **Benefits**
 

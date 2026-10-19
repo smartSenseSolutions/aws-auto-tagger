@@ -51,8 +51,14 @@ class CloudTrailTagger:
                 logger.debug(f"Skipping unsupported event: {event_name}")
                 continue
 
+            try:
+                detail = json.loads(event.get("CloudTrailEvent", "{}"))
+            except ValueError as e:
+                logger.error(f"Invalid CloudTrailEvent JSON for {event_name}: {e}")
+                continue
+
             # Extract resource IDs (can be multiple!)
-            resource_ids = self._extract_resource_ids(event, service_config)
+            resource_ids = self._extract_resource_ids(detail, service_config)
             if not resource_ids:
                 logger.debug(f"No resource IDs found in event: {event_name}")
                 continue
@@ -63,7 +69,7 @@ class CloudTrailTagger:
 
             # Extract creation time from event
             creation_time = self._format_creation_time(event.get("EventTime"))
-            owner_email = self._owner_email(event)
+            owner_email = self._owner_email(detail.get("userIdentity", {}))
 
             # Tag each resource
             for resource_id in resource_ids:
@@ -138,13 +144,12 @@ class CloudTrailTagger:
         logger.debug(f"Total CloudTrail events retrieved: {len(events)}")
         return events
 
-    def _extract_resource_ids(self, event: Dict, config: Dict) -> List[str]:
-        """Extract resource IDs from event using JMESPath - much cleaner!"""
+    def _extract_resource_ids(self, detail: Dict, config: Dict) -> List[str]:
+        """Extract resource IDs from the parsed CloudTrailEvent using JMESPath - much cleaner!"""
         import jmespath
 
         try:
-            cloud_trail_event = json.loads(event.get("CloudTrailEvent", "{}"))
-            section = cloud_trail_event.get(config["section"], {})
+            section = detail.get(config["section"], {})
 
             # Use JMESPath for clean extraction
             result = jmespath.search(config["jmespath"], section)
@@ -180,26 +185,20 @@ class CloudTrailTagger:
             logger.warning(f"Could not format creation time {event_time}: {e}")
             return str(event_time)
 
-    def _owner_email(self, event: Dict) -> str:
+    def _owner_email(self, identity: Dict) -> str:
         """IAM users only: email from the user name, else a valid EMAIL_ID tag, else Unknown.
 
-        Assumed-role/federated session names are caller-chosen, so they are never trusted.
+        Takes CloudTrail `userIdentity`. Assumed-role/federated session names are
+        caller-chosen, so they are never trusted.
         """
-        try:
-            identity = json.loads(event.get("CloudTrailEvent", "{}")).get(
-                "userIdentity", {}
-            )
-        except ValueError:
-            return "Unknown"
-        if identity.get("type") != "IAMUser" or not identity.get("userName"):
+        if identity.get("type") != "IAMUser":
             return "Unknown"
 
         user = identity["userName"]
         if is_email(user):
             return user
-        key = identity.get(
-            "arn", user
-        )  # principal ARN; name only if CloudTrail omits it
+        # cache by principal ARN (name only if CloudTrail omits it)
+        key = identity.get("arn", user)
         if key not in self._email_cache:
             email = "Unknown"
             try:
