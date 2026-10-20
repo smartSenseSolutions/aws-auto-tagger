@@ -9,6 +9,22 @@ from dataclasses import dataclass
 from typing import List, Optional
 from datetime import datetime
 
+from .utils import env_field
+
+
+@dataclass(frozen=True)
+class Settings:
+    """Runtime settings from environment variables, read when instantiated.
+
+    ponytail: stdlib on purpose, the Lambda package has no dependency bundling
+    (no pydantic-settings). Add type coercion here if a non-str setting shows up.
+    """
+
+    aws_region: str = env_field("AWS_REGION", "us-east-1")
+    # IAM Identity Center directory for SSO owner_email lookup; empty = skip the lookup
+    identity_store_id: str = env_field("IDENTITY_STORE_ID")
+    identity_store_region: str = env_field("IDENTITY_STORE_REGION")
+
 
 @dataclass
 class TaggingStats:
@@ -93,6 +109,8 @@ class TaggingConfig:
 
     owner_tag_name: str = "owner"
     creation_time_tag_name: str = "created_at"
+    owner_email_tag_name: str = "owner_email"
+    iam_email_tag_key: str = "EMAIL_ID"
     creation_time_format: str = "%Y-%m-%d %H:%M:%S UTC"
     include_creation_time: bool = True
     additional_tags: dict = None

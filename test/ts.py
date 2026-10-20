@@ -52,7 +52,9 @@ def test_tag_resource(
             # Get service config for this event
             from src.services import get_service_config
 
-            service_config = get_service_config(event_name)
+            service_config = get_service_config(
+                event_name, event.get("EventSource", "")
+            )
 
             if not service_config:
                 logger.debug(f"No service config for event: {event_name}")

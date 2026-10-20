@@ -5,6 +5,8 @@ Adding a new AWS service is as simple as adding a few lines here.
 Now using JMESPath for much cleaner resource extraction!
 """
 
+from botocore.exceptions import ClientError
+
 from .utils import logger
 
 
@@ -101,7 +103,7 @@ SERVICE_CONFIGS = {
             "eventsource": "eks",
             "resource_type": "eks:cluster",
             "section": "responseElements",
-            "jmespath": "cluster.name",
+            "jmespath": "cluster.name || cluster.clusterName",
         },
         "CreateNodegroup": {
             "eventsource": "eks",
@@ -139,19 +141,13 @@ SERVICE_CONFIGS = {
             "section": "responseElements",
             "jmespath": "keyMetadata.keyId",
         },
-        "CreateAlias": {
-            "eventsource": "kms",
-            "resource_type": "kms:alias",
-            "section": "requestParameters",
-            "jmespath": "aliasName",
-        },
     },
     "secretsmanager": {
         "CreateSecret": {
             "eventsource": "secretsmanager",
             "resource_type": "secretsmanager:secret",
             "section": "responseElements",
-            "jmespath": "arn",
+            "jmespath": "arn || aRN",
         }
     },
     "sns": {
@@ -170,13 +166,15 @@ SERVICE_CONFIGS = {
             "jmespath": "queueUrl",
         }
     },
-    "cloudwatch": {
+    "logs": {
         "CreateLogGroup": {
-            "eventsource": "cloudwatch",
-            "resource_type": "cloudwatch:loggroup",
+            "eventsource": "logs",
+            "resource_type": "logs:loggroup",
             "section": "requestParameters",
             "jmespath": "logGroupName",
-        },
+        }
+    },
+    "cloudwatch": {
         "PutMetricAlarm": {
             "eventsource": "cloudwatch",
             "resource_type": "cloudwatch:alarm",
@@ -211,13 +209,13 @@ SERVICE_CONFIGS = {
             "eventsource": "ecs",
             "resource_type": "ecs:cluster",
             "section": "responseElements",
-            "jmespath": "cluster.clusterName",
+            "jmespath": "cluster.clusterArn",
         },
         "CreateService": {
             "eventsource": "ecs",
             "resource_type": "ecs:service",
             "section": "responseElements",
-            "jmespath": "service.serviceName",
+            "jmespath": "service.serviceArn",
         },
     },
     "autoscaling": {
@@ -244,14 +242,6 @@ SERVICE_CONFIGS = {
             "jmespath": "stateMachineArn",
         }
     },
-    "cloudformation": {
-        "CreateStack": {
-            "eventsource": "cloudformation",
-            "resource_type": "cloudformation:stack",
-            "section": "requestParameters",
-            "jmespath": "stackName",
-        }
-    },
     "efs": {
         "CreateFileSystem": {
             "eventsource": "efs",
@@ -267,11 +257,11 @@ SERVICE_CONFIGS = {
             "section": "requestParameters",
             "jmespath": "databaseInput.name",
         },
-        "CreateGlueTable": {
+        "CreateTable": {
             "eventsource": "glue",
             "resource_type": "glue:table",
             "section": "requestParameters",
-            "jmespath": "tableInput.name",
+            "jmespath": "join('/', [databaseName, tableInput.name])",
         },
     },
     "opensearch": {
@@ -309,7 +299,7 @@ SERVICE_CONFIGS = {
     "bedrock": {
         "CreateModelCustomizationJob": {
             "eventsource": "bedrock",
-            "resource_type": "bedrock:model",
+            "resource_type": "bedrock:customization-job",
             "section": "responseElements",
             "jmespath": "jobArn",
         }
@@ -370,14 +360,14 @@ SERVICE_CONFIGS = {
         "CreateReplicationGroup": {
             "eventsource": "elasticache",
             "resource_type": "elasticache:replicationgroup",
-            "section": "responseElements",
-            "jmespath": "aRN",
+            "section": "requestParameters",
+            "jmespath": "replicationGroupId",
         },
         "CreateCacheCluster": {
             "eventsource": "elasticache",
             "resource_type": "elasticache:cluster",
-            "section": "responseElements",
-            "jmespath": "cacheCluster.aRN",
+            "section": "requestParameters",
+            "jmespath": "cacheClusterId",
         },
     },
     "memorydb": {
@@ -393,7 +383,7 @@ SERVICE_CONFIGS = {
             "eventsource": "iam",
             "resource_type": "iam:role",
             "section": "responseElements",
-            "jmespath": "role.arn",
+            "jmespath": "role.roleName",
         },
         "CreateUser": {
             "eventsource": "iam",
@@ -411,11 +401,28 @@ SERVICE_CONFIGS = {
 }
 
 
-def get_service_config(event_name: str) -> dict:
-    """Get service configuration for an event"""
-    # Search through all eventsources for the event
+# CloudTrail eventSource prefix (`<prefix>.amazonaws.com`) when it differs from the SERVICE_CONFIGS key
+CLOUDTRAIL_SOURCES = {
+    "cloudwatch": "monitoring",
+    "stepfunctions": "states",
+    "efs": "elasticfilesystem",
+    "opensearch": "es",
+    "elbv2": "elasticloadbalancing",
+}
+
+
+def get_service_config(event_name: str, event_source: str = "") -> dict:
+    """Get service configuration for an event.
+
+    Event names are not unique across services (e.g. `CreateCluster` exists for
+    EKS, ECS, Redshift, MSK and MemoryDB), so the CloudTrail `EventSource`
+    (e.g. `ecs.amazonaws.com`) picks the service when given.
+    """
+    prefix = event_source.split(".", 1)[0]
     for eventsource, events in SERVICE_CONFIGS.items():
-        if event_name in events:
+        if event_name not in events:
+            continue
+        if not prefix or prefix == CLOUDTRAIL_SOURCES.get(eventsource, eventsource):
             return events[event_name]
     return None
 
@@ -428,6 +435,7 @@ def tag_resource(
     creation_time: str,
     config,
     clients,
+    owner_email: str | None = None,
 ) -> bool:
     """Tag a resource - simplified logic"""
     logger.debug(f"Tagging: {resource_type}:{resource_id}")
@@ -438,6 +446,9 @@ def tag_resource(
         # Add creation time tag if available
         if creation_time:
             tags.append({"Key": config.creation_time_tag_name, "Value": creation_time})
+
+        if owner_email:
+            tags.append({"Key": config.owner_email_tag_name, "Value": owner_email})
 
         # Add additional tags
         if config.additional_tags:
@@ -452,8 +463,20 @@ def tag_resource(
                 clients["ec2"].create_tags(Resources=[resource_id], Tags=tags)
 
             case "s3":
+                # put_bucket_tagging replaces the whole set: merge so existing tags survive
+                try:
+                    existing = clients["s3"].get_bucket_tagging(Bucket=resource_id)
+                except ClientError as e:
+                    if e.response["Error"]["Code"] != "NoSuchTagSet":
+                        raise
+                    existing = {}
+                merged = {t["Key"]: t["Value"] for t in existing.get("TagSet", [])}
+                merged |= {t["Key"]: t["Value"] for t in tags}
                 clients["s3"].put_bucket_tagging(
-                    Bucket=resource_id, Tagging={"TagSet": tags}
+                    Bucket=resource_id,
+                    Tagging={
+                        "TagSet": [{"Key": k, "Value": v} for k, v in merged.items()]
+                    },
                 )
 
             case "rds":
@@ -523,18 +546,17 @@ def tag_resource(
                 tag_dict = {tag["Key"]: tag["Value"] for tag in tags}
                 clients["sqs"].tag_queue(QueueUrl=resource_id, Tags=tag_dict)
 
+            case "logs":
+                clients["logs"].tag_resource(
+                    resourceArn=f"arn:aws:logs:{clients['region']}:{clients['account_id']}:log-group:{resource_id}",
+                    tags={tag["Key"]: tag["Value"] for tag in tags},
+                )
+
             case "cloudwatch":
-                if resource_type == "cloudwatch:loggroup":
-                    tag_dict = {tag["Key"]: tag["Value"] for tag in tags}
-                    clients["cloudwatch-logs"].tag_log_group(
-                        logGroupName=resource_id, tags=tag_dict
-                    )
-                else:
-                    tag_dict = {tag["Key"]: tag["Value"] for tag in tags}
-                    clients["cloudwatch"].tag_resource(
-                        ResourceARN=f"arn:aws:cloudwatch:{clients['region']}:{clients['account_id']}:alarm:{resource_id}",
-                        Tags=[{"Key": k, "Value": v} for k, v in tag_dict.items()],
-                    )
+                clients["cloudwatch"].tag_resource(
+                    ResourceARN=f"arn:aws:cloudwatch:{clients['region']}:{clients['account_id']}:alarm:{resource_id}",
+                    Tags=[{"Key": tag["Key"], "Value": tag["Value"]} for tag in tags],
+                )
 
             case "route53":
                 # Route 53 uses resource ID and key-value tags
@@ -549,19 +571,16 @@ def tag_resource(
             case "apigateway":
                 # API Gateway uses resource ARN
                 tag_dict = {tag["Key"]: tag["Value"] for tag in tags}
+                kind = "apikeys" if resource_type == "apigateway:apikey" else "restapis"
                 clients["apigateway"].tag_resource(
-                    resourceArn=f"arn:aws:apigateway:{clients['region']}::/restapis/{resource_id}",
+                    resourceArn=f"arn:aws:apigateway:{clients['region']}::/{kind}/{resource_id}",
                     tags=tag_dict,
                 )
 
             case "ecs":
-                # ECS expects ARN and key-value tags
-                if resource_type == "ecs:cluster":
-                    cluster_arn = f"arn:aws:ecs:{clients['region']}:{clients['account_id']}:cluster/{resource_id}"
-                else:
-                    cluster_arn = f"arn:aws:ecs:{clients['region']}:{clients['account_id']}:service/{resource_id}"
+                # resource_id is the cluster/service ARN from the response (handles the long ARN format)
                 clients["ecs"].tag_resource(
-                    resourceArn=cluster_arn,
+                    resourceArn=resource_id,
                     tags=[{"key": tag["Key"], "value": tag["Value"]} for tag in tags],
                 )
 
@@ -578,14 +597,6 @@ def tag_resource(
                 clients["stepfunctions"].tag_resource(
                     resourceArn=resource_id,
                     tags=[{"key": k, "value": v} for k, v in tag_dict.items()],
-                )
-
-            case "cloudformation":
-                # CloudFormation expects stack name and key-value tags
-                clients["cloudformation"].update_stack(
-                    StackName=resource_id,
-                    Tags=[{"Key": tag["Key"], "Value": tag["Value"]} for tag in tags],
-                    UsePreviousTemplate=True,
                 )
 
             case "efs":
@@ -671,9 +682,14 @@ def tag_resource(
                 clients["batch"].tag_resource(resourceArn=resource_id, tags=tag_dict)
 
             case "elasticache":
-                # ElastiCache expects ARN and key-value tags
-                clients["elasticache"].tag_resource(
-                    ResourceName=resource_id,
+                # ElastiCache expects ARN; resource_id is the cluster/replication group ID
+                kind = (
+                    "replicationgroup"
+                    if resource_type == "elasticache:replicationgroup"
+                    else "cluster"
+                )
+                clients["elasticache"].add_tags_to_resource(
+                    ResourceName=f"arn:aws:elasticache:{clients['region']}:{clients['account_id']}:{kind}:{resource_id}",
                     Tags=[{"Key": tag["Key"], "Value": tag["Value"]} for tag in tags],
                 )
 
@@ -692,10 +708,30 @@ def tag_resource(
                 )
 
             case "iam":
-                # IAM expects ARN and key-value tags
-                clients["iam"].tag_resource(
-                    ResourceArn=resource_id,
-                    Tags=[{"Key": tag["Key"], "Value": tag["Value"]} for tag in tags],
+                # IAM has one tag API per resource type
+                iam_tags = [{"Key": tag["Key"], "Value": tag["Value"]} for tag in tags]
+                if resource_type == "iam:role":
+                    clients["iam"].tag_role(RoleName=resource_id, Tags=iam_tags)
+                elif resource_type == "iam:user":
+                    clients["iam"].tag_user(UserName=resource_id, Tags=iam_tags)
+                else:
+                    clients["iam"].tag_policy(PolicyArn=resource_id, Tags=iam_tags)
+
+            case "bedrock":
+                clients["bedrock"].tag_resource(
+                    resourceARN=resource_id,
+                    tags=[{"key": tag["Key"], "value": tag["Value"]} for tag in tags],
+                )
+
+            case "cloudfront":
+                # CloudFront is global: no region in the ARN
+                clients["cloudfront"].tag_resource(
+                    Resource=f"arn:aws:cloudfront::{clients['account_id']}:distribution/{resource_id}",
+                    Tags={
+                        "Items": [
+                            {"Key": tag["Key"], "Value": tag["Value"]} for tag in tags
+                        ]
+                    },
                 )
 
             case _:

@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750" role="img" aria-label="aws-tagger run: EventBridge invokes the Lambda every 24 hours; it pulls the last 25 hours of write events from CloudTrail, matches supported events, extracts resource IDs, resolves owner_email via IAM user tags or the Identity Center profile (optional), and tags each new resource with owner, created_at and owner_email; a Resource Group collects everything tagged created_at.">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6e7781"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0969da"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1a7f37"/>
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1f2328" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <!-- own background so it reads on GitHub light and dark themes -->
+  <rect x="0.5" y="0.5" width="1199" height="749" rx="14" fill="#ffffff" stroke="#d0d7de"/>
+
+  <g font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" fill="#1f2328">
+
+    <!-- Header -->
+    <text x="32" y="44" font-size="22" font-weight="700">aws-tagger</text>
+    <text x="160" y="44" font-size="14" fill="#57606a">one scheduled run: pull CloudTrail events → resolve the owner → tag new resources</text>
+    <line x1="32" y1="66" x2="1168" y2="66" stroke="#d8dee4"/>
+
+    <!-- Legend -->
+    <g filter="url(#shadow)">
+      <rect x="880" y="90" width="288" height="118" rx="10" fill="#f6f8fa" stroke="#d0d7de"/>
+    </g>
+    <text x="896" y="114" font-size="12" font-weight="700" fill="#57606a" letter-spacing="0.5">LEGEND</text>
+    <circle cx="906" cy="136" r="10" fill="#e8730c"/>
+    <text x="906" y="140" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">n</text>
+    <text x="926" y="140" font-size="12">processing step inside the Lambda</text>
+    <line x1="896" y1="162" x2="916" y2="162" stroke="#0969da" stroke-width="2"/>
+    <text x="926" y="166" font-size="12">owner_email lookup</text>
+    <line x1="896" y1="188" x2="916" y2="188" stroke="#6e7781" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="926" y="192" font-size="12">optional / derived (no API call)</text>
+
+    <!-- Left column: AWS sources and sinks -->
+    <g filter="url(#shadow)">
+      <rect x="32" y="90" width="220" height="60" rx="10" fill="#fdf2f8" stroke="#bf3989" stroke-width="1.5"/>
+      <rect x="32" y="162" width="220" height="60" rx="10" fill="#fdf2f8" stroke="#bf3989" stroke-width="1.5"/>
+      <rect x="32" y="562" width="220" height="60" rx="10" fill="#fdf2f8" stroke="#bf3989" stroke-width="1.5"/>
+    </g>
+    <text x="48" y="115" font-size="14" font-weight="600">EventBridge schedule</text>
+    <text x="48" y="136" font-size="12" fill="#57606a">rate(24 hours)</text>
+    <text x="48" y="187" font-size="14" font-weight="600">CloudTrail</text>
+    <text x="48" y="208" font-size="12" fill="#57606a">event history · same region</text>
+    <text x="48" y="587" font-size="14" font-weight="600">CloudWatch Logs</text>
+    <text x="48" y="608" font-size="12" fill="#57606a">run summary · errors</text>
+
+    <!-- Lambda container -->
+    <g filter="url(#shadow)">
+      <rect x="300" y="84" width="464" height="576" rx="14" fill="#fff8f0" stroke="#e8730c" stroke-width="1.5"/>
+    </g>
+    <rect x="320" y="100" width="30" height="30" rx="7" fill="#e8730c"/>
+    <text x="335" y="122" font-size="19" font-weight="700" fill="#ffffff" text-anchor="middle">λ</text>
+    <text x="362" y="113" font-size="15" font-weight="700">AWS Lambda</text>
+    <text x="362" y="131" font-size="12" fill="#57606a">{stage}-aws-tagger · src/main.py → CloudTrailTagger.run()</text>
+
+    <!-- Steps -->
+    <g filter="url(#shadow)">
+      <rect x="332" y="156" width="400" height="72" rx="10" fill="#ffffff" stroke="#f0b37e" stroke-width="1.5"/>
+      <rect x="332" y="256" width="400" height="72" rx="10" fill="#ffffff" stroke="#f0b37e" stroke-width="1.5"/>
+      <rect x="332" y="356" width="400" height="72" rx="10" fill="#ffffff" stroke="#f0b37e" stroke-width="1.5"/>
+      <rect x="332" y="456" width="400" height="72" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="2"/>
+      <rect x="332" y="556" width="400" height="72" rx="10" fill="#ffffff" stroke="#f0b37e" stroke-width="1.5"/>
+    </g>
+    <g fill="#e8730c">
+      <circle cx="362" cy="192" r="14"/>
+      <circle cx="362" cy="292" r="14"/>
+      <circle cx="362" cy="392" r="14"/>
+      <circle cx="362" cy="492" r="14" fill="#0969da"/>
+      <circle cx="362" cy="592" r="14"/>
+    </g>
+    <g font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">
+      <text x="362" y="197">1</text>
+      <text x="362" y="297">2</text>
+      <text x="362" y="397">3</text>
+      <text x="362" y="497">4</text>
+      <text x="362" y="597">5</text>
+    </g>
+    <g font-size="14" font-weight="600">
+      <text x="388" y="187">Fetch write events</text>
+      <text x="388" y="287">Match supported event</text>
+      <text x="388" y="387">Extract resource ID(s)</text>
+      <text x="388" y="487">Resolve owner_email</text>
+      <text x="388" y="587">Tag each resource</text>
+    </g>
+    <g font-size="12" fill="#57606a">
+      <text x="388" y="208">LookupEvents · last 25h · ReadOnly=false</text>
+      <text x="388" y="308">SERVICE_CONFIGS lookup · unsupported → skip</text>
+      <text x="388" y="408">JMESPath on requestParameters / responseElements</text>
+      <text x="388" y="508">from userIdentity · cached per run</text>
+      <text x="388" y="608">tag_resource → per-service tagging API</text>
+    </g>
+
+    <!-- Right column: identity lookups -->
+    <g filter="url(#shadow)">
+      <rect x="880" y="380" width="288" height="60" rx="10" fill="#eef6ff" stroke="#0969da" stroke-width="1.5"/>
+      <rect x="880" y="470" width="288" height="60" rx="10" fill="#eef6ff" stroke="#0969da" stroke-width="1.5" stroke-dasharray="6 4"/>
+    </g>
+    <text x="896" y="405" font-size="14" font-weight="600">IAM</text>
+    <text x="896" y="426" font-size="12" fill="#57606a">ListUserTags → tag EMAIL_ID</text>
+    <text x="896" y="495" font-size="14" font-weight="600">IAM Identity Center</text>
+    <text x="896" y="516" font-size="12" fill="#57606a">Identity Store: GetUserId + DescribeUser</text>
+
+    <!-- Right column: outputs -->
+    <g filter="url(#shadow)">
+      <rect x="880" y="550" width="288" height="84" rx="10" fill="#effbf1" stroke="#1a7f37" stroke-width="1.5"/>
+      <rect x="880" y="666" width="288" height="60" rx="10" fill="#effbf1" stroke="#1a7f37" stroke-width="1.5" stroke-dasharray="6 4"/>
+    </g>
+    <text x="896" y="574" font-size="14" font-weight="600">Newly created resources</text>
+    <text x="896" y="593" font-size="12" fill="#57606a">34 services · EC2, S3, Lambda, RDS, …</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" text-anchor="middle">
+      <rect x="896" y="602" width="52" height="20" rx="10" fill="#dafbe1" stroke="#1a7f37"/>
+      <text x="922" y="616">owner</text>
+      <rect x="956" y="602" width="86" height="20" rx="10" fill="#dafbe1" stroke="#1a7f37"/>
+      <text x="999" y="616">created_at</text>
+      <rect x="1050" y="602" width="94" height="20" rx="10" fill="#dafbe1" stroke="#1a7f37"/>
+      <text x="1097" y="616">owner_email</text>
+    </g>
+    <text x="896" y="691" font-size="14" font-weight="600">Resource Group</text>
+    <text x="896" y="712" font-size="12" fill="#57606a">{stage}-aws-tagged-resources</text>
+
+    <!-- Arrows: main flow -->
+    <g fill="none" stroke="#6e7781" stroke-width="1.75">
+      <path d="M252 120 H298" marker-end="url(#arrow)"/>
+      <path d="M252 192 H330" marker-end="url(#arrow)"/>
+      <path d="M532 228 V254" marker-end="url(#arrow)"/>
+      <path d="M532 328 V354" marker-end="url(#arrow)"/>
+      <path d="M532 428 V454" marker-end="url(#arrow)"/>
+      <path d="M532 528 V554" marker-end="url(#arrow)"/>
+      <path d="M300 592 H254" marker-end="url(#arrow)"/>
+    </g>
+    <g fill="none" stroke="#1a7f37" stroke-width="1.75">
+      <path d="M732 592 H878" marker-end="url(#arrow-green)"/>
+      <path d="M1024 634 V664" stroke-dasharray="6 4" marker-end="url(#arrow-green)"/>
+    </g>
+    <!-- Arrows: owner_email lookups -->
+    <g fill="none" stroke="#0969da" stroke-width="1.75">
+      <path d="M734 472 H800 V410 H878" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+      <path d="M734 500 H878" stroke-dasharray="6 4" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+    </g>
+
+    <!-- Arrow labels -->
+    <g font-size="12" fill="#57606a" text-anchor="middle">
+      <text x="275" y="112">invoke</text>
+      <text x="276" y="184">pull</text>
+      <text x="277" y="584">logs</text>
+    </g>
+    <g font-size="12" font-weight="600" text-anchor="middle">
+      <text x="839" y="402" fill="#0969da">IAM user</text>
+      <text x="806" y="492" fill="#0969da">SSO user · optional</text>
+      <text x="806" y="584" fill="#1a7f37">writes tags</text>
+      <text x="1016" y="654" fill="#1a7f37" text-anchor="end" font-weight="400">tag query: created_at</text>
+    </g>
+  </g>
+</svg>

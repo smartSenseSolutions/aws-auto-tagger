@@ -253,3 +253,6 @@ terraform.rc
 tmp/
 temp/
 *.temp.*
+.env
+*.env
+.*.env

@@ -32,7 +32,6 @@ provider:
             - 'ecs:*Tag*'
             - 'ecr:*Tag*'
             - 'states:*Tag*'
-            - 'cloudformation:*Tag*'
             - 'elasticfilesystem:*Tag*'
             - 'es:*Tag*'
             - 'redshift:*Tag*'
@@ -53,6 +52,9 @@ provider:
             - 'batch:*Tag*'
             - 'elasticache:*Tag*'
             - 'memorydb:*Tag*'
+            # SSO owner_email lookup (needs IDENTITY_STORE_ID, see README)
+            - 'identitystore:GetUserId'
+            - 'identitystore:DescribeUser'
           Resource: '*'
       managedPolicies:
         - arn:aws:iam::aws:policy/AWSCloudTrail_ReadOnlyAccess
@@ -62,6 +64,7 @@ package:
   individually: true
   exclude:
     - "test/**"
+    - "docs/**"
     - "tmp/**"
     - "**/__pycache__/**"
     - ".ruff_cache/**"
@@ -83,6 +86,9 @@ functions:
     memorySize: 512
     ephemeralStorageSize: 512
     name: ${sls:stage}-aws-tagger
+    environment:
+      IDENTITY_STORE_ID: ${env:IDENTITY_STORE_ID, ''}
+      IDENTITY_STORE_REGION: ${env:IDENTITY_STORE_REGION, ''}
     events:
     - schedule:
         name: ${sls:stage}-${self:functions.tagger.name}

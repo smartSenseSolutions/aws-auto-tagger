@@ -3,6 +3,21 @@ Utilities for AWS CloudTrail Resource Tagger v1
 """
 
 import logging
+import os
+import re
+from dataclasses import field
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def is_email(value: str) -> bool:
+    """True if value looks like an email address"""
+    return bool(_EMAIL_RE.match(value))
+
+
+def env_field(name: str, default: str = ""):
+    """Dataclass field read from env var `name` when the dataclass is instantiated"""
+    return field(default_factory=lambda: os.getenv(name, default))
 
 
 # Configure logger for v1 package
