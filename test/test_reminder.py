@@ -91,14 +91,14 @@ def test_notify_dms_owners_and_falls_back():
 
     assert notifier.sent["alice@corp.com"].splitlines() == [
         "You have 2 resources older than 7 days:",
-        "• 42d · eu-west-1 · rds:db · test-db",  # oldest first
-        "• 9d · us-east-1 · ec2:instance · i-1",
+        "• 42d · eu-west-1 · rds:db · `test-db`",  # oldest first
+        "• 9d · us-east-1 · ec2:instance · `i-1`",
     ]
     (fallback,) = notifier.fallback
     assert "*bob* (bob@corp.com)" in fallback
     assert "*deploy-role* (Unknown)" in fallback
     assert "*carol* (no owner_email)" in fallback
-    assert "• 30d · us-east-1 · s3 · old-bucket" in fallback
+    assert "• 30d · us-east-1 · s3 · `old-bucket`" in fallback
     assert stats == {"resources": 5, "owners_notified": 1, "fallback": 3, "errors": 0}
 
 
@@ -198,7 +198,7 @@ def test_settings_empty_env_uses_default(monkeypatch):
     assert "{count}" in s.slack_message_template
 
 
-def test_slack_call_retries_429_and_raises_on_error(monkeypatch):
+def test_slack_call_transport(monkeypatch):
     import io
     import json
     import urllib.error
@@ -206,9 +206,9 @@ def test_slack_call_retries_429_and_raises_on_error(monkeypatch):
     import src.slack as slack_module
 
     responses = [
-        urllib.error.HTTPError("u", 429, "slow down", {"Retry-After": "0"}, None),
         io.BytesIO(json.dumps({"ok": True, "user": {"id": "U1"}}).encode()),
         io.BytesIO(json.dumps({"ok": False, "error": "invalid_auth"}).encode()),
+        urllib.error.HTTPError("u", 429, "slow down", {}, None),
     ]
     requests = []
 
@@ -220,9 +220,17 @@ def test_slack_call_retries_429_and_raises_on_error(monkeypatch):
         return r
 
     monkeypatch.setattr(slack_module.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setattr(slack_module.time, "sleep", lambda s: None)
     slack = Slack("xoxb-test")
-    assert slack.user_id_for_email("a@b.com") == "U1"  # retried after 429
+    assert slack.call("users.lookupByEmail", email="a@b.com")["user"]["id"] == "U1"
     assert requests[0].headers["Authorization"] == "Bearer xoxb-test"
     with pytest.raises(SlackError, match="invalid_auth"):
         slack.call("chat.postMessage", channel="C1", text="x")
+    with pytest.raises(SlackError, match="http_429"):
+        slack.call("chat.postMessage", channel="C1", text="x")
+
+
+def test_names_are_inline_code_so_urls_dont_link():
+    # a bare domain in a name would be auto-linked by Slack; backticks can't break out
+    r = stale("arn:aws:logs:us-east-1:1:log-group:a`phish.example.com", 9)
+    (line,) = Reminder(LogNotifier(), 7, "", now=NOW).lines([r])
+    assert line == "• 9d · us-east-1 · logs:log-group · `a'phish.example.com`"

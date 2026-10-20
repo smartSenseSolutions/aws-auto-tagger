@@ -167,15 +167,16 @@ Once a week (Monday 09:00 IST) a separate `reminder` Lambda sends each owner a S
 ```
 Hi! You have 3 AWS resources older than 7 days.
 Please delete what you no longer need:
-• 42d · us-east-1 · ec2:instance · i-0abc123def4567890
-• 19d · us-east-1 · s3 · demo-test-bucket
-• 9d · eu-west-1 · rds:db · test-db-1
+• 42d · us-east-1 · ec2:instance · `i-0abc123def4567890`
+• 19d · us-east-1 · s3 · `demo-test-bucket`
+• 9d · eu-west-1 · rds:db · `test-db-1`
 ```
 
 - **Optional**: the function is deployed but does nothing until `SLACK_TOKEN_PARAM` is set.
 - **Who gets what**: resources are found via the Resource Groups Tagging API (everything with a `created_at` tag) in each of `SLACK_REGIONS`, grouped by `owner_email`, and each owner is looked up in Slack by that email (`users.lookupByEmail`) and DMed one message covering all regions (oldest first, max 50 lines).
 - **Fallback**: resources whose owner has no `owner_email` (tagged before it existed), `Unknown`, or no Slack account with that email are listed, grouped by `owner`, in `SLACK_FALLBACK_CHANNEL` (or only logged if unset).
 - IAM users/roles are not included: the Tagging API doesn't return IAM principals.
+- **Trust**: recipients come from the `owner_email` tag, and anyone allowed to tag a resource can change it. Lock the tagger's tags down so only the tagger's role can write them, e.g. an SCP denying `tag:TagResources`/`<service>:*Tag*` with `aws:TagKeys` in `owner`, `owner_email`, `created_at` unless `aws:PrincipalArn` is the tagger role. Resource names are sent as inline code so Slack doesn't turn them into links.
 
 ### Setup
 

@@ -28,13 +28,12 @@ class Reminder:
         notifier: Notifier,
         min_age_days: int,
         template: str,
-        config: TaggingConfig | None = None,
         now: datetime | None = None,
     ):
         self.notifier = notifier
         self.min_age_days = min_age_days
         self.template = template
-        self.config = config or TaggingConfig()
+        self.config = TaggingConfig()
         self.now = now or datetime.now(timezone.utc)
 
     def run(self, regions: list[str]) -> dict:
@@ -120,7 +119,9 @@ class Reminder:
         out = []
         for r in rows[: self.MAX_ITEMS]:
             kind, name = arn_type_and_name(r["arn"])
-            out.append(f"• {r['age']}d · {r['region']} · {kind} · {name}")
+            # names come from user-writable resources: inline code stops Slack auto-linking URLs
+            name = name.replace("`", "'")
+            out.append(f"• {r['age']}d · {r['region']} · {kind} · `{name}`")
         if len(rows) > self.MAX_ITEMS:
             out.append(f"…and {len(rows) - self.MAX_ITEMS} more")
         return out

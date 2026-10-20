@@ -27,10 +27,8 @@ def arn_type_and_name(arn: str) -> tuple[str, str]:
     """('ec2:instance', 'i-0abc') from an ARN; ('s3', 'my-bucket') when there's no type part"""
     parts = arn.split(":", 5)
     service, resource = parts[2], parts[5] if len(parts) == 6 else ""
-    cuts = [i for i in (resource.find("/"), resource.find(":")) if i != -1]
-    if not cuts:
-        return service, resource
-    return f"{service}:{resource[: min(cuts)]}", resource[min(cuts) + 1 :]
+    head, *rest = re.split(r"[/:]", resource, maxsplit=1)
+    return (f"{service}:{head}", rest[0]) if rest else (service, head)
 
 
 # Configure logger for v1 package
