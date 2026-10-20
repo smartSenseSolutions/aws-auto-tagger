@@ -19,13 +19,13 @@ Automatically tags AWS resources based on CloudTrail events. When someone create
 - [AWS CloudTrail Resource Tagger](#aws-cloudtrail-resource-tagger)
   - [Table of Contents](#table-of-contents)
   - [Architecture](#architecture)
+  - [Supported AWS Services](#supported-aws-services)
   - [Getting started](#getting-started)
     - [Pre-required tools](#pre-required-tools)
     - [Install packages](#install-packages)
     - [Test locally](#test-locally)
     - [Deploy to AWS Lambda with scheduling](#deploy-to-aws-lambda-with-scheduling)
   - [Tags applied](#tags-applied)
-  - [Supported AWS Services](#supported-aws-services)
 
 ## Architecture
 
@@ -41,7 +41,19 @@ How a run works:
 6. **Tag**: `tag_resource` calls the right tagging API for the service, because ARN vs. name vs. ID and the tag shape differ per service.
 7. **Group**: the `<stage>-aws-tagged-resources` Resource Group (created by `serverless.yml`) shows every resource that has a `created_at` tag. The Lambda doesn't write to it.
 
+## Supported AWS Services
 
+The AWS Tagger automatically tags resources from the following AWS services:
+
+- **Compute**: EC2, Lambda, ECS, ECR, EKS, Auto Scaling, Batch
+- **Storage/Database**: S3, EFS, RDS/Aurora, DynamoDB, Redshift, ElastiCache, MemoryDB
+- **Streaming/Messaging**: Kinesis, Kafka (MSK), SNS, SQS
+- **Networking**: VPC, ELB, CloudFront, Route53
+- **Security**: IAM, KMS, Secrets Manager, Cognito
+- **Monitoring**: CloudWatch Logs, CloudWatch Alarms
+- **Development**: API Gateway, Step Functions, CloudFormation
+- **Analytics**: Glue, OpenSearch, Bedrock
+- **Mobile**: Amplify
 
 ## Getting started
 
@@ -97,14 +109,28 @@ flowchart TD
     N -->|no| TAG{"IAM tag EMAIL_ID<br/>is a valid email?"}
     TAG -->|yes| E2["EMAIL_ID value"]
     TAG -->|no| UNK["Unknown"]
-    TY -->|AssumedRole| S{"issuer role is<br/>aws-reserved/sso.amazonaws.com/<br/>AWSReservedSSO_*?"}
-    S -->|"no (caller-chosen session name)"| UNK
-    S -->|yes| P{"IDENTITY_STORE_ID set and<br/>profile has a valid email?"}
+    TY -->|AssumedRole| S{"Identity Center role?<br/>AWSReservedSSO_*"}
+    S -->|"no (caller-chosen name)"| UNK
+    S -->|yes| P{"profile email found?<br/>(IDENTITY_STORE_ID set)"}
     P -->|yes| E3["primary profile email"]
     P -->|no| SN{"session name is<br/>an email?"}
     SN -->|yes| E4["session name"]
     SN -->|no| UNK
     TY -->|"Root, FederatedUser, other"| UNK
+
+    classDef start fill:#fff8f0,stroke:#e8730c,stroke-width:2px,color:#1f2328
+    classDef iam fill:#eef6ff,stroke:#0969da,stroke-width:2px,color:#1f2328
+    classDef sso fill:#f5f0ff,stroke:#8250df,stroke-width:2px,color:#1f2328
+    classDef email fill:#dafbe1,stroke:#1a7f37,stroke-width:2px,color:#1f2328
+    classDef unknown fill:#ffebe9,stroke:#cf222e,stroke-width:2px,color:#1f2328
+    class U,TY start
+    class N,TAG iam
+    class S,P,SN sso
+    class E1,E2,E3,E4 email
+    class UNK unknown
+    linkStyle 1,2,3,4,5 stroke:#0969da,stroke-width:2px
+    linkStyle 6,7,8,9,10,11,12 stroke:#8250df,stroke-width:2px
+    linkStyle 13 stroke:#cf222e,stroke-width:2px
 ```
 
 *IAM user* (CloudTrail `userIdentity.type == IAMUser`), in this order:
@@ -130,17 +156,3 @@ The Identity Store API is only callable from the Identity Center management (or 
 Other assumed-role, federated and root identities always resolve to `Unknown`: their CloudTrail name is a caller-chosen session name and can't be trusted.
 
 To make emails resolvable for IAM users, tag them, e.g. `aws iam tag-user --user-name <name> --tags Key=EMAIL_ID,Value=<email>`. Restrict who may write `EMAIL_ID` (e.g. via an IAM policy/SCP on `aws:TagKeys`), since changing it redirects notifications.
-
-## Supported AWS Services
-
-The AWS Tagger automatically tags resources from the following AWS services:
-
-- **Compute**: EC2, Lambda, ECS, ECR, EKS, Auto Scaling, Batch
-- **Storage/Database**: S3, EFS, RDS/Aurora, DynamoDB, Redshift, ElastiCache, MemoryDB
-- **Streaming/Messaging**: Kinesis, Kafka (MSK), SNS, SQS
-- **Networking**: VPC, ELB, CloudFront, Route53
-- **Security**: IAM, KMS, Secrets Manager, Cognito
-- **Monitoring**: CloudWatch Logs, CloudWatch Alarms
-- **Development**: API Gateway, Step Functions, CloudFormation
-- **Analytics**: Glue, OpenSearch, Bedrock
-- **Mobile**: Amplify
