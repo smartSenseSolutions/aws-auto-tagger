@@ -32,7 +32,6 @@ provider:
             - 'ecs:*Tag*'
             - 'ecr:*Tag*'
             - 'states:*Tag*'
-            - 'cloudformation:*Tag*'
             - 'elasticfilesystem:*Tag*'
             - 'es:*Tag*'
             - 'redshift:*Tag*'

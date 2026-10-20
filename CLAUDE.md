@@ -49,11 +49,11 @@ Flow, per invocation:
 ### Adding support for a new AWS service/event
 
 This requires touching **three** places that must stay in sync:
-1. `src/services.py` — add an entry to `SERVICE_CONFIGS[eventsource][EventName]` with `eventsource`, `resource_type`, `section`, and a `jmespath` expression to extract the resource ID from the CloudTrail event.
+1. `src/services.py` — add an entry to `SERVICE_CONFIGS[eventsource][EventName]` with `eventsource`, `resource_type`, `section`, and a `jmespath` expression to extract the resource ID from the CloudTrail event. The key must be the boto3 client name; events are matched on name **and** CloudTrail `EventSource` (names like `CreateCluster` repeat across services), so if the key differs from the `EventSource` prefix (`<prefix>.amazonaws.com`), add it to `CLOUDTRAIL_SOURCES`.
 2. `src/services.py::tag_resource` — add a `case "<eventsource>":` branch calling the correct boto3 tagging API (ARN construction, tag shape, and client method all vary per service — check existing cases for the pattern that matches, e.g. IAM-list-of-dicts vs. plain dict).
 3. `src/clients.py` derives the boto3 client dict directly from `SERVICE_CONFIGS.keys()`, so a new top-level `eventsource` key automatically gets a client — but the corresponding IAM `Action` (`<service>:*Tag*`) must also be added to `serverless.yml`'s `provider.iam.role.statements`.
 
-`test/test_sls_lint.py::test_validate_sls_policy` enforces step 3 — it fails if any `SERVICE_CONFIGS` key has no matching IAM action in `serverless.yml`. Run this test after adding a service.
+`test/test_sls_lint.py::test_validate_sls_policy` enforces step 3 — it fails if any `SERVICE_CONFIGS` key has no matching IAM action in `serverless.yml`. `test/test_services.py` runs every configured event through `tag_resource` with real boto3 clients (calls stop after botocore validates the params, no AWS access), catching a missing `case`, a wrong client/method name or bad params, and checks each event resolves via its `EventSource`. Run `uv run pytest test` after adding a service.
 
 ### README sync
 

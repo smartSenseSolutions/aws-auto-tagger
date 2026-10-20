@@ -51,9 +51,11 @@ The AWS Tagger automatically tags resources from the following AWS services:
 - **Networking**: VPC, ELB, CloudFront, Route53
 - **Security**: IAM, KMS, Secrets Manager, Cognito
 - **Monitoring**: CloudWatch Logs, CloudWatch Alarms
-- **Development**: API Gateway, Step Functions, CloudFormation
+- **Development**: API Gateway, Step Functions
 - **Analytics**: Glue, OpenSearch, Bedrock
 - **Mobile**: Amplify
+
+IAM, CloudFront and Route53 are global services: CloudTrail records their events in `us-east-1`, so deploy the tagger there (or run it there too) to tag them. CloudFormation stacks are not tagged (the only way is a stack update), but the resources a stack creates are tagged from their own events.
 
 ## Getting started
 

@@ -62,7 +62,9 @@ class CloudTrailTagger:
             username = event.get("Username", "Unknown")
 
             # Check if we support this event
-            service_config = get_service_config(event_name)
+            service_config = get_service_config(
+                event_name, event.get("EventSource", "")
+            )
             if not service_config:
                 logger.debug(f"Skipping unsupported event: {event_name}")
                 continue
