@@ -27,7 +27,7 @@ Also read `TaggingConfig` in `src/data.py` for the tag names and `tag_resource` 
    - Keep existing category order and wording; add a new category only if nothing fits.
 2. **Intro bullet** ("Supports AWS services (EC2, S3, ...)"): keep it a short sample list; make sure every name in it is actually supported.
 3. **Tags applied** section: table must list exactly the tags `tag_resource` writes, with the key names from `TaggingConfig`; keep the `owner_email` resolution order in sync with `CloudTrailTagger._owner_email` in `src/tagger.py`.
-4. Mermaid diagram and table of contents: keep the tag label and anchors consistent with the above.
+4. Architecture image `docs/architecture.svg` (hand-written SVG, edit the `<text>` directly) and table of contents: keep the tag label (`owner, created_at, owner_email`), the service count in "N services: ..." (= number of `SERVICE_CONFIGS` keys) and anchors consistent with the above.
 
 ## 3. Report
 

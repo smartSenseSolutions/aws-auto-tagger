@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A scheduled AWS Lambda that reads CloudTrail events, detects resource-creation calls (e.g. `RunInstances`, `CreateBucket`), and tags the new resource with `owner` (the CloudTrail username) and `created_at` (the event time). Deployed via the Serverless Framework, triggered on a `rate(24 hours)` schedule.
+A scheduled AWS Lambda that reads CloudTrail events, detects resource-creation calls (e.g. `RunInstances`, `CreateBucket`), and tags the new resource with `owner` (the CloudTrail username), `created_at` (the event time) and `owner_email` (resolved from the caller's `userIdentity`: IAM users via their name or `EMAIL_ID` tag, IAM Identity Center/SSO users via their Identity Store profile when `IDENTITY_STORE_ID` is set, otherwise `Unknown`; see `CloudTrailTagger._owner_email`). Deployed via the Serverless Framework, triggered on a `rate(24 hours)` schedule.
 
 ## Commands
 
@@ -14,6 +14,7 @@ uv sync
 
 # Run locally against real AWS creds (uses AWS_REGION or defaults to us-east-1, hours=25)
 export AWS_PROFILE=<your-profile>
+export IDENTITY_STORE_ID=d-xxxxxxxxxx   # optional: SSO owner_email lookup
 python -m src.main
 
 # Run tests
@@ -68,7 +69,8 @@ After any code change under `src/` (new/removed service, tag names, tagging beha
 - `src/services.py` — the service registry (`SERVICE_CONFIGS`) and the tagging dispatch (`tag_resource`). This is where nearly all service-specific logic lives.
 - `src/tagger.py` — orchestration: fetch events, extract resource IDs, call `tag_resource`, collect stats.
 - `src/clients.py` — builds one boto3 client per eventsource in `SERVICE_CONFIGS`, plus `cloudtrail`, `region`, `account_id`.
-- `src/utils.py` — shared helpers (logger setup, `is_email`, and any other small reusable function). Home for anything not specific to one service or to orchestration.
-- `src/data.py` — plain dataclasses (`TaggingStats`, `ResourceInfo`, `EventProcessingResult`, `TaggingConfig`) used as return/config types; no logic.
-- `serverless.yml` — Lambda config (schedule, memory/timeout) and the IAM policy that must list a `*Tag*` action per supported service.
+- `src/utils.py` — shared helpers (logger setup, `is_email`, `env_field`, and any other small reusable function). Home for anything not specific to one service or to orchestration.
+- `src/data.py` — plain dataclasses (`Settings` for env vars, `TaggingStats`, `ResourceInfo`, `EventProcessingResult`, `TaggingConfig`) used as config/return types; no logic.
+- `serverless.yml` — Lambda config (schedule, memory/timeout, env vars) and the IAM policy that must list a `*Tag*` action per supported service (plus `identitystore:GetUserId`/`DescribeUser` for SSO).
+- `docs/architecture.svg` — hand-written SVG architecture diagram shown in the README; kept in sync by the `sync-readme` skill.
 - `test/stack/` — a Terraform stack (with its own state) used to spin up real test resources across services; not part of the pytest suite.

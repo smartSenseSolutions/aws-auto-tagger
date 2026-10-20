@@ -29,28 +29,17 @@ Automatically tags AWS resources based on CloudTrail events. When someone create
 
 ## Architecture
 
-```mermaid
-graph LR
-    AE[Cron event] --> LF[Lambda Function] 
-    
-    CT[CloudTrail] --> LF
+![aws-tagger architecture: EventBridge invokes the Lambda every 24h; it pulls 25h of write events from CloudTrail, matches and extracts resource IDs, resolves owner_email via IAM or Identity Center, and tags each new resource](docs/architecture.svg)
 
-    LF --> AWS[Tag AWS Resources 'owner : created_at : owner_email']
-    
-    AWS
-    subgraph "Resource Tagged"
-        direction TB
-        AWS --> EC2[EC2]
-        AWS --> S3[S3]
-        AWS --> LAMBDA[LAMBDA]
-        AWS --> IAM[IAM]
-        AWS --> RDS[RDS]
-        AWS --> EKS[EKS]
-        AWS --> ELBV2[ELBV2]
-    end
+How a run works:
 
-    AWS--> RG[Resource Group]
-```
+1. **Trigger**: EventBridge invokes the Lambda every 24 hours.
+2. **Fetch**: the Lambda pulls the last **25h** of write (non read-only) management events from CloudTrail event history in its own region. No trail is needed. The extra hour overlaps the previous run, so events at the schedule boundary aren't missed. Re-tagging is idempotent.
+3. **Match**: each event's `EventName` is looked up in `SERVICE_CONFIGS` (`src/services.py`). Unsupported events are skipped.
+4. **Extract**: a JMESPath expression pulls the resource ID(s) out of `requestParameters` or `responseElements`. One event can create several resources (e.g. `RunInstances`).
+5. **Resolve owner**: `owner` is the CloudTrail username. `owner_email` comes from the caller's `userIdentity`, via an IAM user tag or the Identity Center profile (see [Tags applied](#tags-applied)).
+6. **Tag**: `tag_resource` calls the right tagging API for the service, because ARN vs. name vs. ID and the tag shape differ per service.
+7. **Group**: the `<stage>-aws-tagged-resources` Resource Group (created by `serverless.yml`) shows every resource that has a `created_at` tag. The Lambda doesn't write to it.
 
 
 
@@ -99,6 +88,24 @@ sls deploy
 | `owner_email` | Email of the owner, or `Unknown` (see below) |
 
 `owner_email` is resolved for **IAM users** and **IAM Identity Center (SSO) users**:
+
+```mermaid
+flowchart TD
+    U["CloudTrail userIdentity"] --> TY{"type?"}
+    TY -->|IAMUser| N{"userName is<br/>an email?"}
+    N -->|yes| E1["userName"]
+    N -->|no| TAG{"IAM tag EMAIL_ID<br/>is a valid email?"}
+    TAG -->|yes| E2["EMAIL_ID value"]
+    TAG -->|no| UNK["Unknown"]
+    TY -->|AssumedRole| S{"issuer role is<br/>aws-reserved/sso.amazonaws.com/<br/>AWSReservedSSO_*?"}
+    S -->|"no (caller-chosen session name)"| UNK
+    S -->|yes| P{"IDENTITY_STORE_ID set and<br/>profile has a valid email?"}
+    P -->|yes| E3["primary profile email"]
+    P -->|no| SN{"session name is<br/>an email?"}
+    SN -->|yes| E4["session name"]
+    SN -->|no| UNK
+    TY -->|"Root, FederatedUser, other"| UNK
+```
 
 *IAM user* (CloudTrail `userIdentity.type == IAMUser`), in this order:
 1. The IAM user name looks like an email address → used as is.
