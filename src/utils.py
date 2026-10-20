@@ -16,8 +16,21 @@ def is_email(value: str) -> bool:
 
 
 def env_field(name: str, default: str = ""):
-    """Dataclass field read from env var `name` when the dataclass is instantiated"""
-    return field(default_factory=lambda: os.getenv(name, default))
+    """Dataclass field read from env var `name` when the dataclass is instantiated.
+
+    Empty counts as unset: serverless.yml passes unset vars through as ''.
+    """
+    return field(default_factory=lambda: os.getenv(name) or default)
+
+
+def arn_type_and_name(arn: str) -> tuple[str, str]:
+    """('ec2:instance', 'i-0abc') from an ARN; ('s3', 'my-bucket') when there's no type part"""
+    parts = arn.split(":", 5)
+    service, resource = parts[2], parts[5] if len(parts) == 6 else ""
+    cuts = [i for i in (resource.find("/"), resource.find(":")) if i != -1]
+    if not cuts:
+        return service, resource
+    return f"{service}:{resource[: min(cuts)]}", resource[min(cuts) + 1 :]
 
 
 # Configure logger for v1 package

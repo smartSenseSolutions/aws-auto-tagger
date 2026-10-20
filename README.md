@@ -26,6 +26,7 @@ Automatically tags AWS resources based on CloudTrail events. When someone create
     - [Test locally](#test-locally)
     - [Deploy to AWS Lambda with scheduling](#deploy-to-aws-lambda-with-scheduling)
   - [Tags applied](#tags-applied)
+  - [Slack cleanup reminders (optional)](#slack-cleanup-reminders-optional)
 
 ## Architecture
 
@@ -158,3 +159,54 @@ The Identity Store API is only callable from the Identity Center management (or 
 Other assumed-role, federated and root identities always resolve to `Unknown`: their CloudTrail name is a caller-chosen session name and can't be trusted.
 
 To make emails resolvable for IAM users, tag them, e.g. `aws iam tag-user --user-name <name> --tags Key=EMAIL_ID,Value=<email>`. Restrict who may write `EMAIL_ID` (e.g. via an IAM policy/SCP on `aws:TagKeys`), since changing it redirects notifications.
+
+## Slack cleanup reminders (optional)
+
+Once a week (Monday 09:00 IST) a separate `reminder` Lambda sends each owner a Slack DM listing the resources they created that are older than `SLACK_MIN_AGE_DAYS`, so forgotten test resources get cleaned up:
+
+```
+Hi! You have 3 AWS resources older than 7 days.
+Please delete what you no longer need:
+• 42d · us-east-1 · ec2:instance · i-0abc123def4567890
+• 19d · us-east-1 · s3 · demo-test-bucket
+• 9d · eu-west-1 · rds:db · test-db-1
+```
+
+- **Optional**: the function is deployed but does nothing until `SLACK_TOKEN_PARAM` is set.
+- **Who gets what**: resources are found via the Resource Groups Tagging API (everything with a `created_at` tag) in each of `SLACK_REGIONS`, grouped by `owner_email`, and each owner is looked up in Slack by that email (`users.lookupByEmail`) and DMed one message covering all regions (oldest first, max 50 lines).
+- **Fallback**: resources whose owner has no `owner_email` (tagged before it existed), `Unknown`, or no Slack account with that email are listed, grouped by `owner`, in `SLACK_FALLBACK_CHANNEL` (or only logged if unset).
+- IAM users/roles are not included: the Tagging API doesn't return IAM principals.
+
+### Setup
+
+1. Create a Slack app with bot scopes `chat:write`, `users:read`, `users:read.email`, install it to the workspace, and copy the **Bot User OAuth Token** (`xoxb-...`). Invite the bot to the fallback channel.
+2. Store the token as a SecureString (the Lambda may only read parameters under `/aws-tagger/`):
+   ```
+   aws ssm put-parameter --name /aws-tagger/slack-bot-token --type SecureString --value 'xoxb-...'
+   ```
+3. Deploy with the settings exported:
+   ```
+   export SLACK_TOKEN_PARAM=/aws-tagger/slack-bot-token
+   export SLACK_REGIONS=us-east-1,eu-west-1       # optional
+   export SLACK_FALLBACK_CHANNEL='#aws-cleanup'   # optional
+   sls deploy
+   ```
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `SLACK_TOKEN_PARAM` | empty (feature off) | SSM SecureString name holding the bot token |
+| `SLACK_REGIONS` | Lambda's region | Comma-separated regions to scan |
+| `SLACK_FALLBACK_CHANNEL` | empty (log only) | Channel for owners that can't be DMed |
+| `SLACK_MIN_AGE_DAYS` | `7` | Only resources at least this old are listed |
+| `SLACK_MESSAGE_TEMPLATE` | `Hi! You have {count} AWS resources older than {days} days...` | Message header, placeholders `{count}`, `{days}` |
+
+### Try it
+
+```
+# dry run: prints each owner's message, sends nothing (needs SLACK_TOKEN_PARAM set, doesn't read it)
+uv run python -m src.reminder
+# really send
+uv run python -m src.reminder --send
+# deployed
+sls invoke -f reminder --data '{"dry_run": true}'
+```

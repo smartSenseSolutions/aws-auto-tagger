@@ -24,6 +24,20 @@ class Settings:
     # IAM Identity Center directory for SSO owner_email lookup; empty = skip the lookup
     identity_store_id: str = env_field("IDENTITY_STORE_ID")
     identity_store_region: str = env_field("IDENTITY_STORE_REGION")
+    # Slack cleanup reminders (src/reminder.py), optional: off while SLACK_TOKEN_PARAM is empty
+    # name of the SSM SecureString holding the bot token (never the token itself in env)
+    slack_token_param: str = env_field("SLACK_TOKEN_PARAM")
+    # comma-separated regions to scan; empty = aws_region
+    slack_regions: str = env_field("SLACK_REGIONS")
+    # where owners without a resolvable Slack user are listed; empty = only log them
+    slack_fallback_channel: str = env_field("SLACK_FALLBACK_CHANNEL")
+    slack_min_age_days: str = env_field("SLACK_MIN_AGE_DAYS", "7")
+    # placeholders: {count}, {days}
+    slack_message_template: str = env_field(
+        "SLACK_MESSAGE_TEMPLATE",
+        "Hi! You have {count} AWS resources older than {days} days.\n"
+        "Please delete what you no longer need:",
+    )
 
 
 @dataclass
