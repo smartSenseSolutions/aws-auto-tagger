@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A scheduled AWS Lambda that reads CloudTrail events, detects resource-creation calls (e.g. `RunInstances`, `CreateBucket`), and tags the new resource with `owner` (the CloudTrail username), `created_at` (the event time) and `owner_email` (resolved from the caller's `userIdentity`: IAM users via their name or `EMAIL_ID` tag, IAM Identity Center/SSO users via their Identity Store profile when `IDENTITY_STORE_ID` is set, otherwise `Unknown`; see `CloudTrailTagger._owner_email`). Deployed via the Serverless Framework, triggered on a `rate(24 hours)` schedule.
+A scheduled AWS Lambda that reads CloudTrail events, detects resource-creation calls (e.g. `RunInstances`, `CreateBucket`), and tags the new resource with `owner` (the CloudTrail username), `created_at` (the event time) and `owner_email` (resolved from the caller's `userIdentity`: IAM users via their name or `EMAIL_ID` tag, IAM Identity Center/SSO users via their Identity Store profile when `IDENTITY_STORE_ID` is set, otherwise `Unknown`; see `CloudTrailTagger._owner_email`). Deployed via the Serverless Framework, triggered on a `rate(24 hours)` schedule. An optional second Lambda (`src/reminder.py`, weekly) DMs each owner on Slack the resources they created that are older than N days; it is a no-op unless `SLACK_TOKEN_PARAM` is set.
 
 ## Commands
 
@@ -16,6 +16,9 @@ uv sync
 export AWS_PROFILE=<your-profile>
 export IDENTITY_STORE_ID=d-xxxxxxxxxx   # optional: SSO owner_email lookup
 python -m src.main
+
+# Slack cleanup reminders: dry run (prints messages), add --send to really send
+uv run python -m src.reminder
 
 # Run tests
 uv run pytest test
@@ -62,6 +65,8 @@ After any code change under `src/` (new/removed service, tag names, tagging beha
 ### Conventions
 
 - Generic reusable helpers (e.g. `is_email`) go in `src/utils.py`, not inline in `tagger.py`/`services.py`. Check there before writing a new one.
+- Optional features stay off until configured (e.g. Slack reminders need `SLACK_TOKEN_PARAM`), and all env vars of one feature share a prefix (`SLACK_*`).
+- Reminder delivery goes through the `src/notifier.py::Notifier` ABC (`send_to_owner`, `send_fallback`); `src/slack.py::Slack` is the implementation and `LogNotifier` is the dry run. A new channel (email, Teams) is a new `Notifier`, `Reminder` stays unchanged.
 - Environment variables are read only through `src/data.py::Settings` (no `os.getenv` elsewhere). Add new env config as a field there, and pass it to the Lambda via `serverless.yml` `functions.tagger.environment`.
 
 ### Key files
@@ -69,7 +74,9 @@ After any code change under `src/` (new/removed service, tag names, tagging beha
 - `src/services.py` — the service registry (`SERVICE_CONFIGS`) and the tagging dispatch (`tag_resource`). This is where nearly all service-specific logic lives.
 - `src/tagger.py` — orchestration: fetch events, extract resource IDs, call `tag_resource`, collect stats.
 - `src/clients.py` — builds one boto3 client per eventsource in `SERVICE_CONFIGS`, plus `cloudtrail`, `region`, `account_id`.
-- `src/utils.py` — shared helpers (logger setup, `is_email`, `env_field`, and any other small reusable function). Home for anything not specific to one service or to orchestration.
+- `src/reminder.py` — optional weekly cleanup reminders: `Reminder` finds resources with an old `created_at` via the Resource Groups Tagging API, groups them by `owner_email`, sends via a `Notifier`; `handler` is the `reminder` Lambda.
+- `src/notifier.py` / `src/slack.py` — `Notifier` ABC + `LogNotifier` (dry run); `Slack` notifier (stdlib urllib, bot token from SSM SecureString `SLACK_TOKEN_PARAM`).
+- `src/utils.py` — shared helpers (logger setup, `is_email`, `env_field`, `arn_type_and_name`, and any other small reusable function). Home for anything not specific to one service or to orchestration.
 - `src/data.py` — plain dataclasses (`Settings` for env vars, `TaggingStats`, `ResourceInfo`, `EventProcessingResult`, `TaggingConfig`) used as config/return types; no logic.
 - `serverless.yml` — Lambda config (schedule, memory/timeout, env vars) and the IAM policy that must list a `*Tag*` action per supported service (plus `identitystore:GetUserId`/`DescribeUser` for SSO).
 - `docs/architecture.svg` — hand-written SVG architecture diagram shown in the README; kept in sync by the `sync-readme` skill.

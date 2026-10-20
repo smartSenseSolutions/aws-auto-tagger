@@ -56,6 +56,11 @@ provider:
             - 'identitystore:GetUserId'
             - 'identitystore:DescribeUser'
           Resource: '*'
+        # Slack reminders: bot token SecureString (SLACK_TOKEN_PARAM must live under /aws-tagger/)
+        - Effect: 'Allow'
+          Action:
+            - 'ssm:GetParameter'
+          Resource: 'arn:aws:ssm:${aws:region}:${aws:accountId}:parameter/aws-tagger/*'
       managedPolicies:
         - arn:aws:iam::aws:policy/AWSCloudTrail_ReadOnlyAccess
         - arn:aws:iam::aws:policy/ResourceGroupsandTagEditorFullAccess
@@ -95,6 +100,26 @@ functions:
         description: a description of ${sls:stage}-${self:functions.tagger.name}'s purpose
         # Can also be an array of rate/cron expressions
         rate: rate(24 hours)
+
+  # Optional weekly Slack cleanup reminders: a no-op until SLACK_TOKEN_PARAM is set (see README)
+  reminder:
+    description: Weekly Slack DM to owners about their AWS resources older than N days
+    handler: src.reminder.handler
+    runtime: python3.12
+    timeout: 300
+    memorySize: 256
+    name: ${sls:stage}-aws-tagger-reminder
+    environment:
+      SLACK_TOKEN_PARAM: ${env:SLACK_TOKEN_PARAM, ''}
+      SLACK_REGIONS: ${env:SLACK_REGIONS, ''}
+      SLACK_FALLBACK_CHANNEL: ${env:SLACK_FALLBACK_CHANNEL, ''}
+      SLACK_MIN_AGE_DAYS: ${env:SLACK_MIN_AGE_DAYS, ''}
+      SLACK_MESSAGE_TEMPLATE: ${env:SLACK_MESSAGE_TEMPLATE, ''}
+    events:
+    - schedule:
+        name: ${self:functions.reminder.name}
+        description: Weekly Slack cleanup reminders, Monday 09:00 IST
+        rate: cron(30 3 ? * MON *)
 
 resources:
   Resources:
