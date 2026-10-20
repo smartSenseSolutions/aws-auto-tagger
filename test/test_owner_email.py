@@ -1,3 +1,5 @@
+import json
+
 from src.data import Settings, TaggingConfig
 from src.tagger import CloudTrailTagger
 
@@ -143,3 +145,32 @@ def test_settings_read_env_at_instantiation(monkeypatch):
         "",
         "us-east-1",
     )
+
+
+def test_run_skips_failed_events(monkeypatch):
+    # a failed CreateLogGroup on an existing name must not re-tag that log group
+    t = make_tagger(StubIam())
+    t.region = "us-east-1"
+
+    def event(error=None):
+        detail = {"requestParameters": {"logGroupName": "victim"}, "userIdentity": {}}
+        if error:
+            detail["errorCode"] = error
+        return {
+            "EventName": "CreateLogGroup",
+            "EventSource": "logs.amazonaws.com",
+            "Username": "mallory",
+            "CloudTrailEvent": json.dumps(detail),
+        }
+
+    tagged = []
+    monkeypatch.setattr(
+        "src.tagger.tag_resource", lambda *a, **k: tagged.append(a[2]) or True
+    )
+    t._get_events = lambda hours: [
+        event("ResourceAlreadyExistsException"),
+        event(),
+    ]
+    result = t.run()
+    assert tagged == ["victim"]  # only the successful call
+    assert result.stats.tagged == 1

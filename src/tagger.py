@@ -77,6 +77,12 @@ class CloudTrailTagger:
                 logger.error(f"Invalid CloudTrailEvent JSON for {event_name}: {e}")
                 continue
 
+            # A failed create (e.g. AlreadyExists) still logs the requested name, which
+            # can point at someone else's resource: never tag from failed calls.
+            if detail.get("errorCode"):
+                logger.debug(f"Skipping failed {event_name}: {detail['errorCode']}")
+                continue
+
             # Extract resource IDs (can be multiple!)
             resource_ids = self._extract_resource_ids(detail, service_config)
             if not resource_ids:
